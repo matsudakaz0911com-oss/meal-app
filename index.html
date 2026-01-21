@@ -4,14 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-　　<meta name="theme-color" content="#e1f5fe">
-　　<meta name="apple-mobile-web-app-status-bar-style" content="default">    
     <title>🍙食事</title>
-    <link rel="apple-touch-icon" href="https://img.shields.io/badge/-%E1%8D%99-e1f5fe?style=for-the-badge&logoSize=large">
-　　<meta name="apple-mobile-web-app-capable" content="yes">
-　　<meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="apple-touch-icon" href="https://via.placeholder.com/180/e1f5fe/000000?text=%F0%9F%8D%99">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
@@ -21,14 +14,14 @@
             --lunch-color: #4cd964; --lunch-bg: #f0fff0;
             --dinner-color: #ff9500; --dinner-bg: #fff9f0;
             --text-main: #000000; --border: #d1d1d6;
+            --count-default: #007aff; 
+            --count-alert: #ff3b30;   
         }
         body {
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", YuGothic, sans-serif;
-    background-color: #e1f5fe; /* ここを直接ミズイロのコードに */
-    color: var(--text-main);
-    margin: 0; padding: 10px 5px 30px 5px;
-    -webkit-user-select: none;
-}
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", YuGothic, sans-serif;
+            background-color: #e1f5fe; color: var(--text-main);
+            margin: 0; padding: 10px 5px 30px 5px; -webkit-user-select: none;
+        }
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 15px; font-weight: 900; }
         .table-container {
             width: 100%; background: var(--card); border-radius: 12px;
@@ -40,8 +33,9 @@
             font-weight: 900; height: 65px; border-bottom: 2px solid var(--border);
         }
         td { padding: 12px 2px; text-align: center; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        .day-label { font-weight: 900; background: #e5e5ea !important; width: 40px; font-size: 1.2rem; border-right: 2px solid var(--border); }
-        .type-label { width: 45px; font-size: 1.0rem; font-weight: bold; border-right: 1px solid var(--border); line-height: 1.2; color: #444; }
+        .day-label { font-weight: 900; background: #e5e5ea !important; width: 40px; font-size: 1.2rem; border-right: 2px solid var(--border); color: #000; }
+        .type-label { width: 48px; font-size: 0.9rem; font-weight: bold; border-right: 1px solid var(--border); line-height: 1.2; color: #444; }
+        .count-badge { display: block; font-size: 1.4rem; font-weight: 900; margin-top: 2px; }
         .lunch-row { background-color: var(--lunch-bg); }
         .dinner-row { background-color: var(--dinner-bg); }
         .stripe-bg { filter: brightness(0.94); }
@@ -65,22 +59,21 @@
 </head>
 <body>
 
-<h1>食事</h1>
+<h1>🍙食事</h1>
 <div id="sync-status">同期中...</div>
 
 <div class="table-container">
     <table id="mealTable">
         <thead>
-            <tr><th style="width: 40px;"></th><th style="width: 45px;"></th><th>和徳</th><th>純</th><th>圭祐</th><th>真采</th></tr>
+            <tr><th style="width: 40px;"></th><th style="width: 48px;"></th><th>和徳</th><th>純</th><th>圭祐</th><th>真采</th></tr>
         </thead>
         <tbody id="tableBody"></tbody>
     </table>
 </div>
 
 <script>
-    // --- STEP 1: Firebase設定 (ここにAPIキーを入力してください) ---
     const firebaseConfig = {
-        apiKey: "AIzaSyApdmvVbshA6Zee6rF5nmgB6OL6dNW8Qek",
+        apiKey: "ご自身のAPIキーに書き換えてください",
         authDomain: "m-famiry-syokujijyunnbi.firebaseapp.com",
         projectId: "m-famiry-syokujijyunnbi",
         databaseURL: "https://m-famiry-syokujijyunnbi-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -92,23 +85,26 @@
     const members = ["和徳", "純", "圭祐", "真采"];
     const days = ["月", "火", "水", "木", "金", "土"];
 
-    // --- STEP 2: テーブル生成 ---
     function initTable() {
         const body = document.getElementById('tableBody');
+        body.innerHTML = '';
         days.forEach((day, index) => {
             const stripeClass = (index % 2 === 0) ? '' : 'stripe-bg';
             const rowL = document.createElement('tr');
             rowL.className = `lunch-row ${stripeClass}`;
-            rowL.innerHTML = `<td rowspan="2" class="day-label">${day}</td><td class="type-label">弁当</td>`;
+            rowL.innerHTML = `
+                <td rowspan="2" class="day-label">${day}</td>
+                <td class="type-label">弁当<span class="count-badge" id="count-${day}-lunch">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-lunch`;
                 let canEdit = (m !== "真采" && !(day === "土" && m !== "圭祐"));
                 rowL.innerHTML += canEdit ? `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('${id}', this.checked)"><span class="slider lunch"></span></label></td>` : `<td><span class="no-entry">ー</span></td>`;
             });
             body.appendChild(rowL);
+
             const rowD = document.createElement('tr');
             rowD.className = `dinner-row ${stripeClass}`;
-            rowD.innerHTML = `<td class="type-label">夕食</td>`;
+            rowD.innerHTML = `<td class="type-label">夕食<span class="count-badge" id="count-${day}-dinner">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-dinner`;
                 rowD.innerHTML += `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('${id}', this.checked)"><span class="slider dinner"></span></label></td>`;
@@ -117,7 +113,6 @@
         });
     }
 
-    // --- STEP 3: リアルタイム同期 ---
     function updateDB(id, value) {
         db.ref('meals/' + id).set(value);
     }
@@ -127,25 +122,37 @@
         document.querySelectorAll('input[type="checkbox"]').forEach(input => {
             input.checked = data[input.id] || false;
         });
-        document.getElementById('sync-status').innerText = "クラウド同期済み (" + new Date().toLocaleTimeString() + ")";
+
+        days.forEach(day => {
+            ["lunch", "dinner"].forEach(type => {
+                let count = 0;
+                members.forEach(m => {
+                    if (data[`${day}-${m}-${type}`] === true) count++;
+                });
+                const el = document.getElementById(`count-${day}-${type}`);
+                el.innerText = count;
+                el.style.color = (count === 3) ? "var(--count-default)" : "var(--count-alert)";
+            });
+        });
+
+        document.getElementById('sync-status').innerText = "同期済 " + new Date().toLocaleTimeString();
         checkAutoReset(data);
     });
 
-    // --- STEP 4: 自動リセット (毎週土曜20時) ---
     function checkAutoReset(data) {
         const now = new Date();
         const lastReset = data.lastResetTime || 0;
-        
-        // 直近の土曜20時の時間を計算
         let targetReset = new Date();
-        targetReset.setDate(now.getDate() - (now.getDay() + 1) % 7); // 前回の土曜
+        targetReset.setDate(now.getDate() - (now.getDay() + 1) % 7); 
         targetReset.setHours(20, 0, 0, 0);
 
         if (now >= targetReset && lastReset < targetReset.getTime()) {
             const updates = {};
-            document.querySelectorAll('input[type="checkbox"]').forEach(input => {
-                const shouldBeOn = !input.id.includes("真采");
-                updates[input.id] = shouldBeOn;
+            days.forEach(day => {
+                members.forEach(m => {
+                    updates[`${day}-${m}-lunch`] = (m !== "真采" && !(day === "土" && m !== "圭祐"));
+                    updates[`${day}-${m}-dinner`] = (m !== "真采");
+                });
             });
             updates['lastResetTime'] = now.getTime();
             db.ref('meals').update(updates);
@@ -155,9 +162,4 @@
     initTable();
 </script>
 </body>
-
 </html>
-
-
-
-
