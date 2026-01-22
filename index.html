@@ -39,6 +39,20 @@
         .lunch-row { background-color: var(--lunch-bg); }
         .dinner-row { background-color: var(--dinner-bg); }
         .stripe-bg { filter: brightness(0.94); }
+        
+        /* 過去の行を暗くするスタイル */
+        .past-day {
+            opacity: 0.35;
+            filter: grayscale(0.8);
+            pointer-events: none;
+        }
+        /* 今日の曜日を強調 */
+        .today-label {
+            color: #007aff !important;
+            border-left: 5px solid #007aff !important;
+            background-color: #ffffff !important;
+        }
+
         .switch { position: relative; display: inline-block; width: 54px; height: 30px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
@@ -88,12 +102,31 @@
     function initTable() {
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
+        
+        const now = new Date();
+        const currentDayIndex = now.getDay(); // 0:日, 1:月... 6:土
+
         days.forEach((day, index) => {
             const stripeClass = (index % 2 === 0) ? '' : 'stripe-bg';
+            const dayNum = index + 1; // 月曜が1
+            
+            let rowClass = "";
+            let labelClass = "";
+            
+            // 過去と今日の判定
+            if (currentDayIndex !== 0) { 
+                if (dayNum < currentDayIndex) {
+                    rowClass = "past-day";
+                } else if (dayNum === currentDayIndex) {
+                    labelClass = "today-label";
+                }
+            }
+
+            // お弁当行
             const rowL = document.createElement('tr');
-            rowL.className = `lunch-row ${stripeClass}`;
+            rowL.className = `lunch-row ${stripeClass} ${rowClass}`;
             rowL.innerHTML = `
-                <td rowspan="2" class="day-label">${day}</td>
+                <td rowspan="2" class="day-label ${labelClass}">${day}</td>
                 <td class="type-label">弁当<span class="count-badge" id="count-${day}-lunch">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-lunch`;
@@ -102,8 +135,9 @@
             });
             body.appendChild(rowL);
 
+            // 夕食行
             const rowD = document.createElement('tr');
-            rowD.className = `dinner-row ${stripeClass}`;
+            rowD.className = `dinner-row ${stripeClass} ${rowClass}`;
             rowD.innerHTML = `<td class="type-label">夕食<span class="count-badge" id="count-${day}-dinner">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-dinner`;
