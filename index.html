@@ -40,18 +40,21 @@
         .dinner-row { background-color: var(--dinner-bg); }
         .stripe-bg { filter: brightness(0.94); }
         
-        /* 過去の行を暗くするスタイル */
-        .past-day {
-            opacity: 0.35;
-            filter: grayscale(0.8);
-            pointer-events: none;
+        /* メモ欄のスタイル */
+        .memo-row { background-color: #fff; }
+        .memo-input {
+            width: 90%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            color: #333;
         }
-        /* 今日の曜日を強調 */
-        .today-label {
-            color: #007aff !important;
-            border-left: 5px solid #007aff !important;
-            background-color: #ffffff !important;
-        }
+
+        .past-day { opacity: 0.35; filter: grayscale(0.8); pointer-events: none; }
+        .today-label { color: #007aff !important; border-left: 5px solid #007aff !important; background-color: #ffffff !important; }
 
         .switch { position: relative; display: inline-block; width: 54px; height: 30px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -102,36 +105,28 @@
     function initTable() {
         const body = document.getElementById('tableBody');
         body.innerHTML = '';
-        
         const now = new Date();
-        const currentDayIndex = now.getDay(); // 0:日, 1:月... 6:土
+        const currentDayIndex = now.getDay();
 
         days.forEach((day, index) => {
             const stripeClass = (index % 2 === 0) ? '' : 'stripe-bg';
-            const dayNum = index + 1; // 月曜が1
-            
+            const dayNum = index + 1;
             let rowClass = "";
             let labelClass = "";
             
-            // 過去と今日の判定
             if (currentDayIndex !== 0) { 
-                if (dayNum < currentDayIndex) {
-                    rowClass = "past-day";
-                } else if (dayNum === currentDayIndex) {
-                    labelClass = "today-label";
-                }
+                if (dayNum < currentDayIndex) rowClass = "past-day";
+                else if (dayNum === currentDayIndex) labelClass = "today-label";
             }
 
             // お弁当行
             const rowL = document.createElement('tr');
             rowL.className = `lunch-row ${stripeClass} ${rowClass}`;
-            rowL.innerHTML = `
-                <td rowspan="2" class="day-label ${labelClass}">${day}</td>
-                <td class="type-label">弁当<span class="count-badge" id="count-${day}-lunch">0</span></td>`;
+            rowL.innerHTML = `<td rowspan="3" class="day-label ${labelClass}">${day}</td><td class="type-label">弁当<span class="count-badge" id="count-${day}-lunch">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-lunch`;
                 let canEdit = (m !== "真采" && !(day === "土" && m !== "圭祐"));
-                rowL.innerHTML += canEdit ? `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('${id}', this.checked)"><span class="slider lunch"></span></label></td>` : `<td><span class="no-entry">ー</span></td>`;
+                rowL.innerHTML += canEdit ? `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('meals/${id}', this.checked)"><span class="slider lunch"></span></label></td>` : `<td><span class="no-entry">ー</span></td>`;
             });
             body.appendChild(rowL);
 
@@ -141,28 +136,46 @@
             rowD.innerHTML = `<td class="type-label">夕食<span class="count-badge" id="count-${day}-dinner">0</span></td>`;
             members.forEach(m => {
                 const id = `${day}-${m}-dinner`;
-                rowD.innerHTML += `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('${id}', this.checked)"><span class="slider dinner"></span></label></td>`;
+                rowD.innerHTML += `<td><label class="switch"><input type="checkbox" id="${id}" onchange="updateDB('meals/${id}', this.checked)"><span class="slider dinner"></span></label></td>`;
             });
             body.appendChild(rowD);
+
+            // メモ行
+            const rowM = document.createElement('tr');
+            rowM.className = `memo-row ${stripeClass} ${rowClass}`;
+            rowM.innerHTML = `<td colspan="5"><input type="text" id="memo-${day}" class="memo-input" placeholder="${day}曜日のメモ..." onchange="updateDB('memos/${day}', this.value)" onfocus="this.select()"></td>`;
+            body.appendChild(rowM);
         });
     }
 
-    function updateDB(id, value) {
-        db.ref('meals/' + id).set(value);
+    function updateDB(path, value) {
+        db.ref(path).set(value);
     }
 
-    db.ref('meals').on('value', (snapshot) => {
-        const data = snapshot.val() || {};
+    // データ同期（スイッチ＋メモ）
+    db.ref().on('value', (snapshot) => {
+        const allData = snapshot.val() || {};
+        const mealData = allData.meals || {};
+        const memoData = allData.memos || {};
+        
+        // スイッチの反映
         document.querySelectorAll('input[type="checkbox"]').forEach(input => {
-            input.checked = data[input.id] || false;
+            input.checked = mealData[input.id] || false;
         });
 
+        // メモの反映（入力中でない場合のみ）
+        document.querySelectorAll('.memo-input').forEach(input => {
+            const day = input.id.split('-')[1];
+            if (document.activeElement !== input) {
+                input.value = memoData[day] || "";
+            }
+        });
+
+        // 人数集計
         days.forEach(day => {
             ["lunch", "dinner"].forEach(type => {
                 let count = 0;
-                members.forEach(m => {
-                    if (data[`${day}-${m}-${type}`] === true) count++;
-                });
+                members.forEach(m => { if (mealData[`${day}-${m}-${type}`] === true) count++; });
                 const el = document.getElementById(`count-${day}-${type}`);
                 el.innerText = count;
                 el.style.color = (count === 3) ? "var(--count-default)" : "var(--count-alert)";
@@ -170,12 +183,14 @@
         });
 
         document.getElementById('sync-status').innerText = "同期済 " + new Date().toLocaleTimeString();
-        checkAutoReset(data);
+        
+        // 自動リセット判定（土曜20時）
+        checkAutoReset(mealData);
     });
 
-    function checkAutoReset(data) {
+    function checkAutoReset(mealData) {
         const now = new Date();
-        const lastReset = data.lastResetTime || 0;
+        const lastReset = mealData.lastResetTime || 0;
         let targetReset = new Date();
         targetReset.setDate(now.getDate() - (now.getDay() + 1) % 7); 
         targetReset.setHours(20, 0, 0, 0);
@@ -187,6 +202,8 @@
                     updates[`${day}-${m}-lunch`] = (m !== "真采" && !(day === "土" && m !== "圭祐"));
                     updates[`${day}-${m}-dinner`] = (m !== "真采");
                 });
+                // メモもリセット
+                db.ref('memos/' + day).set("");
             });
             updates['lastResetTime'] = now.getTime();
             db.ref('meals').update(updates);
@@ -197,4 +214,3 @@
 </script>
 </body>
 </html>
-
