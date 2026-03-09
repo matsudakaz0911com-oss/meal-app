@@ -11,6 +11,10 @@
     <style>
         :root { --bg: #f2f2f7; --plus-color: #007aff; --minus-color: #ff3b30; --text: #1c1c1e; --card-bg: #ffffff; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; padding-bottom: 80px; -webkit-user-select: none; }
+        
+        /* 通信状態バー */
+        #status-bar { font-size: 0.7rem; text-align: center; padding: 5px; color: #888; background: #eee; border-radius: 5px; margin-bottom: 10px; }
+
         .header-sticky { position: sticky; top: 0; background: var(--bg); z-index: 100; padding-top: 5px; margin-bottom: 10px; }
         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
@@ -52,6 +56,8 @@
     </style>
 </head>
 <body>
+
+<div id="status-bar">クラウドに接続中...</div>
 
 <div class="header-sticky">
     <div class="summary-grid">
@@ -118,7 +124,7 @@
 
     window.onload = () => {
         const today = new Date();
-        document.getElementById('date-input').value = today.toISOString().split('T')[0];
+        document.getElementById('date-input').value = today.toLocaleDateString('sv-SE');
         initMonthSelector(today);
     };
 
@@ -126,8 +132,8 @@
         const selector = document.getElementById('month-selector');
         for (let i = 0; i < 12; i++) {
             const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-            const val = d.toISOString().substring(0, 7);
-            const label = `${d.getFullYear()}年 ${d.getMonth() + 1}月`;
+            const val = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2);
+            const label = d.getFullYear() + "年 " + (d.getMonth() + 1) + "月";
             selector.innerHTML += `<option value="${val}">${label}</option>`;
         }
     }
@@ -141,10 +147,14 @@
         btn.innerText = mode === 'minus' ? '支出を記録' : '収入を記録';
     }
 
+    // データ読み込み & 接続状態監視
     db.ref('pocket_money').on('value', (snapshot) => {
+        document.getElementById('status-bar').innerText = "クラウド同期済 (" + new Date().toLocaleTimeString() + ")";
         allData = snapshot.val() || { history: {}, categories: ["お小遣い", "お菓子", "ゲーム", "交通費", "預け入れ"] };
         renderCategories(allData.categories);
         updateView();
+    }, (error) => {
+        document.getElementById('status-bar').innerText = "エラー: " + error.message;
     });
 
     function renderCategories(cats) {
@@ -159,10 +169,15 @@
         let amt = parseInt(document.getElementById('amount').value);
         if(!amt) return;
         amt = currentMode === 'minus' ? -Math.abs(amt) : Math.abs(amt);
+        
         db.ref('pocket_money/history').push({
             date: date, type: type, category: cat, amount: amt, timestamp: firebase.database.ServerValue.TIMESTAMP
+        }).then(() => {
+            document.getElementById('amount').value = "";
+            alert("記録しました！");
+        }).catch((e) => {
+            alert("保存失敗: " + e.message);
         });
-        document.getElementById('amount').value = "";
     }
 
     function deleteItem(key) {
@@ -183,11 +198,10 @@
         items.forEach(item => {
             if(item.type === 'bank') bankTotal += item.amount;
             else cashTotal += item.amount;
-            if (item.date.startsWith(selectedMonth)) {
+            if (item.date && item.date.startsWith(selectedMonth)) {
                 if (item.amount > 0) mPlus += item.amount;
                 else mMinus += Math.abs(item.amount);
-                const dateParts = item.date.split('-');
-                const dayDisp = `${dateParts[1]}/${dateParts[2]}`;
+                const dayDisp = item.date.split('-')[1] + "/" + item.date.split('-')[2];
                 html += `
                     <div class="history-item">
                         <div class="item-left">
