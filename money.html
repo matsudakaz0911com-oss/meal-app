@@ -11,13 +11,11 @@
     <style>
         :root { --bg: #f2f2f7; --plus-color: #007aff; --minus-color: #ff3b30; --text: #1c1c1e; --card-bg: #ffffff; }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; padding-bottom: 80px; -webkit-user-select: none; }
-        
         .header-sticky { position: sticky; top: 0; background: var(--bg); z-index: 100; padding-top: 5px; margin-bottom: 10px; }
         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
         .card-label { font-size: 0.7rem; color: #8e8e93; }
         .card-amount { font-size: 1.1rem; font-weight: bold; }
-        
         .monthly-report { background: #1c1c1e; color: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .report-grid { display: flex; justify-content: space-between; text-align: center; }
@@ -25,14 +23,12 @@
         .report-item:last-child { border-right: none; }
         .report-val { font-size: 0.95rem; font-weight: bold; margin-top: 3px; }
         #month-selector { background: #333; color: white; border: none; font-size: 0.85rem; padding: 5px; border-radius: 6px; }
-
         .input-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .type-selector { display: flex; background: #e5e5ea; border-radius: 10px; padding: 3px; margin-bottom: 12px; }
         .type-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.9rem; }
         .type-btn.active.minus { background: var(--minus-color); color: white; }
         .type-btn.active.plus { background: var(--plus-color); color: white; }
         .type-btn:not(.active) { background: transparent; color: #8e8e93; }
-        
         .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
         select, input { padding: 12px; border-radius: 8px; border: 1px solid #d1d1d6; font-size: 1rem; width: 100%; box-sizing: border-box; }
         #date-input { flex: 1.5; }
@@ -40,7 +36,6 @@
         .btn-add { width: 100%; padding: 16px; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1rem; margin-top: 10px; }
         .btn-add.minus { background: var(--minus-color); }
         .btn-add.plus { background: var(--plus-color); }
-
         .history-title { font-size: 0.9rem; font-weight: bold; color: #666; margin: 0 0 10px 5px; }
         .history { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .history-item { padding: 15px; border-bottom: 0.5px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
@@ -108,7 +103,6 @@
 </div>
 
 <script>
-    // --- STEP 1: Firebase設定 (食事アプリと同じものを貼り付け) ---
     const firebaseConfig = {
         apiKey: "AIzaSyApdmvVbshA6Zee6rF5nmgB60L6dNW8Qek",
         authDomain: "m-famiry-syokujijyunnbi.firebaseapp.com",
@@ -147,7 +141,6 @@
         btn.innerText = mode === 'minus' ? '支出を記録' : '収入を記録';
     }
 
-    // --- STEP 2: お小遣い帳専用のパス "pocket_money" を使用 ---
     db.ref('pocket_money').on('value', (snapshot) => {
         allData = snapshot.val() || { history: {}, categories: ["お小遣い", "お菓子", "ゲーム", "交通費", "預け入れ"] };
         renderCategories(allData.categories);
@@ -193,7 +186,8 @@
             if (item.date.startsWith(selectedMonth)) {
                 if (item.amount > 0) mPlus += item.amount;
                 else mMinus += Math.abs(item.amount);
-                const dayDisp = item.date.split('-')[1] + "/" + item.date.split('-')[2];
+                const dateParts = item.date.split('-');
+                const dayDisp = `${dateParts[1]}/${dateParts[2]}`;
                 html += `
                     <div class="history-item">
                         <div class="item-left">
