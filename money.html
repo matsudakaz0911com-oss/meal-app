@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>💰お小遣い帳</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    <style>
+        :root { --bg: #f2f2f7; --plus-color: #007aff; --minus-color: #ff3b30; --text: #1c1c1e; --card-bg: #ffffff; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; padding-bottom: 80px; -webkit-user-select: none; }
+        
+        .header-sticky { position: sticky; top: 0; background: var(--bg); z-index: 100; padding-top: 5px; margin-bottom: 10px; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+        .card-label { font-size: 0.7rem; color: #8e8e93; }
+        .card-amount { font-size: 1.1rem; font-weight: bold; }
+        
+        .monthly-report { background: #1c1c1e; color: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .report-grid { display: flex; justify-content: space-between; text-align: center; }
+        .report-item { flex: 1; border-right: 0.5px solid #444; }
+        .report-item:last-child { border-right: none; }
+        .report-val { font-size: 0.95rem; font-weight: bold; margin-top: 3px; }
+        #month-selector { background: #333; color: white; border: none; font-size: 0.85rem; padding: 5px; border-radius: 6px; }
+
+        .input-card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .type-selector { display: flex; background: #e5e5ea; border-radius: 10px; padding: 3px; margin-bottom: 12px; }
+        .type-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-weight: bold; font-size: 0.9rem; }
+        .type-btn.active.minus { background: var(--minus-color); color: white; }
+        .type-btn.active.plus { background: var(--plus-color); color: white; }
+        .type-btn:not(.active) { background: transparent; color: #8e8e93; }
+        
+        .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        select, input { padding: 12px; border-radius: 8px; border: 1px solid #d1d1d6; font-size: 1rem; width: 100%; box-sizing: border-box; }
+        #date-input { flex: 1.5; }
+        #wallet-type { flex: 1; }
+        .btn-add { width: 100%; padding: 16px; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 1.1rem; margin-top: 10px; }
+        .btn-add.minus { background: var(--minus-color); }
+        .btn-add.plus { background: var(--plus-color); }
+
+        .history-title { font-size: 0.9rem; font-weight: bold; color: #666; margin: 0 0 10px 5px; }
+        .history { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .history-item { padding: 15px; border-bottom: 0.5px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .item-left { display: flex; flex-direction: column; }
+        .item-cat { font-weight: bold; font-size: 1.05rem; margin-bottom: 2px; }
+        .item-meta { font-size: 0.75rem; color: #8e8e93; display: flex; align-items: center; gap: 5px; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: white; }
+        .badge-bank { background: var(--plus-color); }
+        .badge-cash { background: #34c759; }
+        .item-amount { font-size: 1.1rem; font-weight: bold; }
+        .amt-minus { color: var(--minus-color); }
+        .amt-plus { color: var(--plus-color); }
+        .add-cat-area { margin-top: 30px; padding: 20px; text-align: center; border-top: 1px dashed #ccc; }
+    </style>
+</head>
+<body>
+
+<div class="header-sticky">
+    <div class="summary-grid">
+        <div class="card">
+            <div class="card-label">🏦 銀行残高</div>
+            <div class="card-amount" id="bank-total" style="color:var(--plus-color)">¥0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">👛 手元残高</div>
+            <div class="card-amount" id="cash-total" style="color:#34c759">¥0</div>
+        </div>
+    </div>
+    <div class="monthly-report">
+        <div class="report-header">
+            <select id="month-selector" onchange="updateView()"></select>
+            <span style="font-size:0.7rem; color:#8e8e93;">金額タップで削除</span>
+        </div>
+        <div class="report-grid">
+            <div class="report-item"><div style="font-size:0.6rem; color:#8e8e93;">収入</div><div class="report-val" id="report-plus" style="color:#5ac8fa;">¥0</div></div>
+            <div class="report-item"><div style="font-size:0.6rem; color:#8e8e93;">支出</div><div class="report-val" id="report-minus" style="color:#ff6961;">¥0</div></div>
+            <div class="report-item"><div style="font-size:0.6rem; color:#8e8e93;">収支</div><div class="report-val" id="report-diff">¥0</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="input-card">
+    <div class="type-selector">
+        <button id="mode-minus" class="type-btn active minus" onclick="setMode('minus')">支出</button>
+        <button id="mode-plus" class="type-btn plus" onclick="setMode('plus')">収入</button>
+    </div>
+    <div class="input-row">
+        <input type="date" id="date-input">
+        <select id="wallet-type">
+            <option value="cash">手元</option>
+            <option value="bank">銀行</option>
+        </select>
+    </div>
+    <div class="input-row"><select id="category-list"></select></div>
+    <input type="number" id="amount" placeholder="金額を入力" inputmode="numeric">
+    <button id="save-btn" class="btn-add minus" onclick="addHistory()">支出を記録</button>
+</div>
+
+<div class="history-title">履歴一覧</div>
+<div id="history-list" class="history"></div>
+
+<div class="add-cat-area">
+    <input type="text" id="new-cat" placeholder="新しい摘要" style="width:120px; padding:8px; font-size:0.8rem; border-radius:8px; border:1px solid #ccc;">
+    <button onclick="addCategory()" style="padding:8px 15px; border-radius:8px; background:#8e8e93; color:white; border:none; font-size:0.8rem;">摘要追加</button>
+</div>
+
+<script>
+    // --- STEP 1: Firebase設定 (食事アプリと同じものを貼り付け) ---
+    const firebaseConfig = {
+        apiKey: "ご自身のAPIキーに書き換えてください",
+        authDomain: "m-famiry-syokujijyunnbi.firebaseapp.com",
+        projectId: "m-famiry-syokujijyunnbi",
+        databaseURL: "https://m-famiry-syokujijyunnbi-default-rtdb.asia-southeast1.firebasedatabase.app",
+        appId: "1:978696512734:web:72daf883c9d046c6a28e4f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    let currentMode = 'minus';
+    let allData = { history: {}, categories: [] };
+
+    window.onload = () => {
+        const today = new Date();
+        document.getElementById('date-input').value = today.toISOString().split('T')[0];
+        initMonthSelector(today);
+    };
+
+    function initMonthSelector(today) {
+        const selector = document.getElementById('month-selector');
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const val = d.toISOString().substring(0, 7);
+            const label = `${d.getFullYear()}年 ${d.getMonth() + 1}月`;
+            selector.innerHTML += `<option value="${val}">${label}</option>`;
+        }
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.getElementById('mode-minus').classList.toggle('active', mode === 'minus');
+        document.getElementById('mode-plus').classList.toggle('active', mode === 'plus');
+        const btn = document.getElementById('save-btn');
+        btn.className = `btn-add ${mode}`;
+        btn.innerText = mode === 'minus' ? '支出を記録' : '収入を記録';
+    }
+
+    // --- STEP 2: お小遣い帳専用のパス "pocket_money" を使用 ---
+    db.ref('pocket_money').on('value', (snapshot) => {
+        allData = snapshot.val() || { history: {}, categories: ["お小遣い", "お菓子", "ゲーム", "交通費", "預け入れ"] };
+        renderCategories(allData.categories);
+        updateView();
+    });
+
+    function renderCategories(cats) {
+        const list = document.getElementById('category-list');
+        list.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function addHistory() {
+        const date = document.getElementById('date-input').value;
+        const type = document.getElementById('wallet-type').value;
+        const cat = document.getElementById('category-list').value;
+        let amt = parseInt(document.getElementById('amount').value);
+        if(!amt) return;
+        amt = currentMode === 'minus' ? -Math.abs(amt) : Math.abs(amt);
+        db.ref('pocket_money/history').push({
+            date: date, type: type, category: cat, amount: amt, timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        document.getElementById('amount').value = "";
+    }
+
+    function deleteItem(key) {
+        if(confirm("この履歴を削除しますか？")) { db.ref(`pocket_money/history/${key}`).remove(); }
+    }
+
+    function updateView() {
+        const selectedMonth = document.getElementById('month-selector').value;
+        const list = document.getElementById('history-list');
+        let html = "";
+        let bankTotal = 0, cashTotal = 0;
+        let mPlus = 0, mMinus = 0;
+
+        const historyObj = allData.history || {};
+        const items = Object.keys(historyObj).map(key => ({...historyObj[key], key: key}))
+                      .sort((a, b) => b.date.localeCompare(a.date) || (b.timestamp - a.timestamp));
+
+        items.forEach(item => {
+            if(item.type === 'bank') bankTotal += item.amount;
+            else cashTotal += item.amount;
+            if (item.date.startsWith(selectedMonth)) {
+                if (item.amount > 0) mPlus += item.amount;
+                else mMinus += Math.abs(item.amount);
+                const dayDisp = item.date.split('-')[1] + "/" + item.date.split('-')[2];
+                html += `
+                    <div class="history-item">
+                        <div class="item-left">
+                            <span class="item-cat">${item.category}</span>
+                            <div class="item-meta"><span>${dayDisp}</span><span class="badge ${item.type === 'bank' ? 'badge-bank' : 'badge-cash'}">${item.type === 'bank' ? '銀行' : '手元'}</span></div>
+                        </div>
+                        <div class="item-right" onclick="deleteItem('${item.key}')">
+                            <div class="item-amount ${item.amount < 0 ? 'amt-minus' : 'amt-plus'}">${item.amount > 0 ? '+' : ''}${item.amount.toLocaleString()}</div>
+                        </div>
+                    </div>`;
+            }
+        });
+
+        document.getElementById('bank-total').innerText = "¥" + bankTotal.toLocaleString();
+        document.getElementById('cash-total').innerText = "¥" + cashTotal.toLocaleString();
+        document.getElementById('report-plus').innerText = "¥" + mPlus.toLocaleString();
+        document.getElementById('report-minus').innerText = "¥" + mMinus.toLocaleString();
+        const diff = mPlus - mMinus;
+        document.getElementById('report-diff').innerText = "¥" + diff.toLocaleString();
+        document.getElementById('report-diff').style.color = diff >= 0 ? "#5ac8fa" : "#ff6961";
+        list.innerHTML = html || '<div style="padding:40px;text-align:center;color:#999;font-size:0.8rem;">履歴がありません</div>';
+    }
+
+    function addCategory() {
+        const name = document.getElementById('new-cat').value;
+        if(name) {
+            const currentCats = allData.categories || ["お小遣い", "お菓子", "ゲーム", "交通費", "預け入れ"];
+            db.ref('pocket_money/categories').set([...currentCats, name]);
+            document.getElementById('new-cat').value = "";
+        }
+    }
+</script>
+</body>
+</html>
