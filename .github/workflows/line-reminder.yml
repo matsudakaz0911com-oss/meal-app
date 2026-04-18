@@ -1,0 +1,25 @@
+name: LINE Weekly Reminder
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 毎週日曜 09:00 JST (00:00 UTC)
+  workflow_dispatch:      # 手動実行も可能
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send LINE reminder
+        run: |
+          curl -s -X POST https://api.line.me/v2/bot/message/broadcast \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" \
+            -d '{
+              "messages": [
+                {
+                  "type": "text",
+                  "text": "🍙 今週の食事チェックをお願いします！\nhttps://matsudakaz0911com-oss.github.io/meal-app/"
+                }
+              ]
+            }' \
+          && echo "送信完了" || echo "送信失敗"
