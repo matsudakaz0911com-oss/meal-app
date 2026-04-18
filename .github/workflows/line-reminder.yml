@@ -2,7 +2,7 @@ name: LINE Weekly Reminder
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # 毎週日曜 09:00 JST (00:00 UTC)
+    - cron: '0 11 * * 0'  # 毎週日曜 20:00 JST (11:00 UTC)
   workflow_dispatch:      # 手動実行も可能
 
 jobs:
